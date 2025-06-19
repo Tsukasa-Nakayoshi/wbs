@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>一次受けテストWBS</title>
     <!-- Chosen Palette: Warm Neutrals (Slate & Amber) -->
-    <!-- Application Structure Plan: A dashboard-style SPA with three main views: 1) A Timeline (Gantt Chart) for chronological understanding, 2) A Task Board (Kanban) for status tracking, and 3) A Detailed List for granular filtering and searching. This structure provides multiple perspectives on the same data. Tab-based navigation makes switching between these analytical views seamless and intuitive. Data persistence is handled via browser's LocalStorage, meaning data is saved locally on the user's device and not synced across multiple users or devices. -->
+    <!-- Application Structure Plan: A dashboard-style SPA with three main views: 1) A Timeline (Gantt Chart) for chronological understanding, 2) A Task Board (Kanban) for status tracking, and 3) A Detailed List for granular filtering and searching. This structure provides multiple perspectives on the same data. Tab-based navigation makes switching between these analytical analytical views seamless and intuitive. Data persistence is handled via browser's LocalStorage, meaning data is saved locally on the user's device and not synced across multiple users or devices. -->
     <!-- Visualization & Content Choices:
         - Overall Stats: Inform -> HTML Cards -> Non-interactive -> Quick, scannable summary -> HTML/Tailwind.
         - Status Breakdown: (REMOVED) -> Replaced by calculated progress based on days.
@@ -28,7 +28,6 @@
             "完了": { bg: "bg-emerald-200", text: "text-emerald-800" },
             "問題あり": { bg: "bg-red-200", text: "text-red-800" },
         };
-        // statusChartColorsは円グラフ削除に伴い不要だが、他の場所で参照されていないことを確認済み
         const statusChartColors = {
             "未着手": '#e2e8f0', // slate-200
             "進行中": '#7dd3fc', // sky-300
@@ -93,9 +92,6 @@
         }
 
         // --- Render Functions ---
-        // statusChartInstanceは円グラフ削除に伴い不要
-        // let statusChartInstance = null; 
-
         function renderMetrics() {
             // 総期間の計算
             let totalProjectDays = 0;
@@ -125,11 +121,6 @@
                 progress = Math.round((completedTaskDuration / totalTaskDuration) * 100);
             }
             document.getElementById('current-progress').textContent = `${progress}%`;
-
-            // 円グラフは削除されるため、以下のChart.js関連のコードは不要
-            // const statusCounts = wbsData.reduce((acc, task) => { /* ... */ });
-            // const ctx = document.getElementById('status-chart').getContext('2d');
-            // if (statusChartInstance) { /* ... */ } else { /* ... */ }
         }
 
         function renderGanttChart() {
@@ -270,7 +261,7 @@
 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-10';
-                tooltip.innerHTML = `<strong>${task.name}</strong><br>期間: ${task.start} ~ ${task.end}<br>担当: ${task.person}<br>状態: ${task.status}`;
+                tooltip.innerHTML = `<strong>${task.name}</strong><br>期間: ${task.start} ~ ${task.end}<br>担当: ${task.person}<br>状態: ${task.status}<br>メモ: ${task.memo || 'なし'}`; // メモを追加
                 bar.appendChild(tooltip);
 
                 bar.addEventListener('mouseover', () => tooltip.style.opacity = 1);
@@ -317,6 +308,7 @@
                             <div class="bg-white p-3 rounded-md shadow-sm border-l-4 ${statusColors[task.status].bg.replace('bg-', 'border-')}">
                                 <p class="font-medium text-sm">${task.name}</p>
                                 <p class="text-xs text-slate-500 mt-1">${task.person}</p>
+                                <p class="text-xs text-slate-400 mt-1">${task.memo || 'メモなし'}</p> <!-- メモを追加 -->
                             </div>
                         `).join('')}
                     </div>
@@ -337,7 +329,7 @@
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-slate-900">${task.name}</div>
-                        <div class="text-sm text-slate-500">${task.phase}</div>
+                        <div class="text-sm text-slate-500">${task.memo || ''}</div> <!-- task.phaseをtask.memoに置き換え -->
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${task.person}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${task.start} ~ ${task.end} (${task.duration}日)</td>
@@ -374,32 +366,36 @@
 
         function setupFilters() {
             const persons = [...new Set(wbsData.map(t => t.person))];
-            const phases = [...new Set(wbsData.map(t => t.phase))];
+            // phasesフィルターは削除
+            // const phases = [...new Set(wbsData.map(t => t.phase))];
 
             const personFilter = document.getElementById('filter-person');
             personFilter.innerHTML = '<option value="">全担当者</option>';
             persons.forEach(p => personFilter.innerHTML += `<option value="${p}">${p}</option>`);
 
-            const phaseFilter = document.getElementById('filter-phase');
-            phaseFilter.innerHTML = '<option value="">全フェーズ</option>';
-            phases.forEach(p => phaseFilter.innerHTML += `<option value="${p}">${p}</option>`);
+            // filter-phase要素はHTMLから削除されているため、ここでの参照も不要
+            // const phaseFilter = document.getElementById('filter-phase');
+            // phaseFilter.innerHTML = '<option value="">全フェーズ</option>';
+            // phases.forEach(p => phaseFilter.innerHTML += `<option value="${p}">${p}</option>`);
 
             const searchInput = document.getElementById('search-input');
 
             const applyFilters = () => {
                 const searchTerm = searchInput.value.toLowerCase();
                 const selectedPerson = personFilter.value;
-                const selectedPhase = phaseFilter.value;
+                // selectedPhaseは削除
+                // const selectedPhase = phaseFilter.value;
 
                 const filtered = wbsData.filter(task =>
                     task.name.toLowerCase().includes(searchTerm) &&
-                    (selectedPerson === '' || task.person === selectedPerson) &&
-                    (selectedPhase === '' || task.phase === selectedPhase)
+                    (selectedPerson === '' || task.person === selectedPerson)
+                    // && (selectedPhase === '' || task.phase === selectedPhase) // フィルター条件から削除
                 );
                 renderTaskList(filtered);
             };
 
-            [searchInput, personFilter, phaseFilter].forEach(el => el.addEventListener('input', applyFilters));
+            // phaseFilterはイベントリスナーから削除
+            [searchInput, personFilter].forEach(el => el.addEventListener('input', applyFilters));
         }
 
         // --- Add/Edit Task Modal Logic ---
@@ -422,7 +418,8 @@
             document.getElementById('new-task-person').value = task.person;
             document.getElementById('new-task-start').value = task.start;
             document.getElementById('new-task-end').value = task.end;
-            document.getElementById('new-task-phase').value = task.phase;
+            // new-task-phaseをnew-task-memoに置き換え
+            document.getElementById('new-task-memo').value = task.memo || ''; // メモは必須ではないので|| ''
             document.getElementById('new-task-status').value = task.status;
 
             document.getElementById('add-task-modal').classList.remove('hidden');
@@ -449,11 +446,13 @@
             const person = document.getElementById('new-task-person').value;
             const start = document.getElementById('new-task-start').value;
             const end = document.getElementById('new-task-end').value;
-            const phase = document.getElementById('new-task-phase').value;
+            // new-task-phaseをnew-task-memoに置き換え、requiredではないので必須チェックから外す
+            const memo = document.getElementById('new-task-memo').value;
             const status = document.getElementById('new-task-status').value;
 
-            if (!name || !person || !start || !end || !phase || !status) {
-                document.getElementById('modal-message').textContent = 'すべての項目を入力してください。';
+            // 必須入力チェックからphase（memo）を外す
+            if (!name || !person || !start || !end || !status) {
+                document.getElementById('modal-message').textContent = 'すべての必須項目を入力してください。';
                 document.getElementById('modal-message').classList.remove('hidden');
                 document.getElementById('modal-message').classList.add('text-red-600');
                 return;
@@ -471,18 +470,17 @@
             const duration = dateDiffInDays(startDate, endDate) + 1;
 
             const taskData = {
-                id: currentEditingTaskId || crypto.randomUUID(), // Generate new ID if adding
+                id: currentEditingTaskId || crypto.randomUUID(),
                 name: name,
                 person: person,
                 start: start,
                 end: end,
-                phase: phase,
+                memo: memo, // phaseをmemoに置き換え
                 status: status,
                 duration: duration
             };
 
             if (currentEditingTaskId) {
-                // Update existing task
                 const taskIndex = wbsData.findIndex(t => t.id === currentEditingTaskId);
                 if (taskIndex !== -1) {
                     wbsData[taskIndex] = taskData;
@@ -494,7 +492,6 @@
                     return;
                 }
             } else {
-                // Add new task
                 wbsData.push(taskData);
                 document.getElementById('modal-message').textContent = 'タスクが正常に追加されました！';
             }
@@ -502,7 +499,7 @@
             document.getElementById('modal-message').classList.remove('hidden');
             document.getElementById('modal-message').classList.add('text-green-600');
 
-            saveTasksToLocalStorage(); // Save to local storage after modification
+            saveTasksToLocalStorage();
 
             setTimeout(() => {
                 hideAddTaskModal();
@@ -528,7 +525,7 @@
             if (!taskIdToDelete) return;
 
             wbsData = wbsData.filter(task => task.id !== taskIdToDelete);
-            saveTasksToLocalStorage(); // Save to local storage after deletion
+            saveTasksToLocalStorage();
 
             hideDeleteConfirmModal();
         }
@@ -776,9 +773,10 @@
                         <select id="filter-person" class="p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
                             <option value="">全担当者</option>
                         </select>
-                        <select id="filter-phase" class="p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
+                        <!-- フェーズフィルターを削除 -->
+                        <!-- <select id="filter-phase" class="p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
                             <option value="">全フェーズ</option>
-                        </select>
+                        </select> -->
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-slate-200">
@@ -840,8 +838,8 @@
                         </div>
                     </div>
                     <div>
-                        <label for="new-task-phase" class="block text-sm font-medium text-slate-700">フェーズ</label>
-                        <input type="text" id="new-task-phase" required class="mt-1 block w-full p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
+                        <label for="new-task-memo" class="block text-sm font-medium text-slate-700">メモ</label> <!-- フェーズをメモに変更 -->
+                        <input type="text" id="new-task-memo" class="mt-1 block w-full p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500"> <!-- required属性を削除 -->
                     </div>
                     <div>
                         <label for="new-task-status" class="block text-sm font-medium text-slate-700">状態</label>
