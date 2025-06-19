@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ローカルストレージ版ヘルプデスク導入テストダッシュボード</title>
+    <title>一次受けテストWBS</title>
     <!-- Chosen Palette: Warm Neutrals (Slate & Amber) -->
     <!-- Application Structure Plan: A dashboard-style SPA with three main views: 1) A Timeline (Gantt Chart) for chronological understanding, 2) A Task Board (Kanban) for status tracking, and 3) A Detailed List for granular filtering and searching. This structure provides multiple perspectives on the same data. Tab-based navigation makes switching between these analytical views seamless and intuitive. Data persistence is handled via browser's LocalStorage, meaning data is saved locally on the user's device and not synced across multiple users or devices. -->
     <!-- Visualization & Content Choices:
@@ -222,7 +222,7 @@
                 if (d.getMonth() !== currentMonth) {
                     if (currentMonth !== -1) {
                         monthSpans.push({
-                            text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' }),
+                            text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }), // YYYY年を削除
                             span: monthDayCount
                         });
                     }
@@ -242,7 +242,7 @@
             }
             if (currentMonth !== -1 && monthDayCount > 0) {
                  monthSpans.push({
-                    text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' }),
+                    text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }), // YYYY年を削除
                     span: monthDayCount
                 });
             }
@@ -614,7 +614,7 @@
 
         <!-- Header -->
         <header class="mb-8">
-            <h1 class="text-4xl font-bold text-slate-800">ローカルストレージ版ヘルプデスク導入テストダッシュボード</h1>
+            <h1 class="text-4xl font-bold text-slate-800">一次受けテストWBS</h1>
             <p class="mt-2 text-lg text-slate-600">プロジェクト全体の状況とタスク詳細をインタラクティブに可視化します。（データはブラウザにローカル保存されます）</p>
             <div id="user-info" class="mt-4 text-sm text-slate-500">
                 <span>データはローカルに保存されます。</span>
