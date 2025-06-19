@@ -175,7 +175,7 @@
             container.innerHTML = '';
 
             if (wbsData.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-slate-500 col-span-full">タスクがありません。新しいタスクを追加してください。</div>';
+                container.innerHTML = '<div class="text-center py-8 text-slate-500 col-span-full row-span-full flex items-center justify-center">タスクがありません。新しいタスクを追加してください。</div>';
                 return;
             }
 
@@ -184,33 +184,61 @@
             const projectEndDate = new Date(Math.max(...allDates));
             const totalProjectDays = dateDiffInDays(projectStartDate, projectEndDate) + 1;
 
-            const taskColDiv = document.createElement('div');
-            taskColDiv.className = 'gantt-task-col';
-            const timelineColDiv = document.createElement('div');
-            timelineColDiv.className = 'gantt-timeline-col overflow-x-auto';
+            // Main grid for the Gantt chart layout
+            container.classList.add('grid', 'grid-cols-[minmax(150px,_250px)_1fr]', 'grid-rows-[auto_auto_1fr]', 'h-[60vh]', 'max-h-[500px]', 'overflow-hidden');
 
-            const taskHeader = document.createElement('div');
-            taskHeader.className = 'font-bold p-2 border-b bg-slate-50 sticky top-0 z-10';
-            taskHeader.textContent = 'タスク';
-            taskColDiv.appendChild(taskHeader);
+            // --- Row 1, Column 1: Top-left placeholder ---
+            const topLeftPlaceholder = document.createElement('div');
+            topLeftPlaceholder.className = 'font-bold p-2 border-b border-r border-gray-300 bg-slate-50 sticky top-0 left-0 z-30';
+            container.appendChild(topLeftPlaceholder);
 
+            // --- Row 1, Column 2: Month Headers (Horizontal scrollable) ---
+            const monthHeadersScrollWrapper = document.createElement('div');
+            monthHeadersScrollWrapper.className = 'overflow-x-auto relative z-20';
             const monthHeadersDiv = document.createElement('div');
             monthHeadersDiv.id = 'gantt-month-headers';
-            monthHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-200 sticky top-0 z-10';
+            monthHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-200';
             monthHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
+            monthHeadersScrollWrapper.appendChild(monthHeadersDiv);
+            container.appendChild(monthHeadersScrollWrapper);
 
+            // --- Row 2, Column 1: Task Header (Sticky) ---
+            const taskHeader = document.createElement('div');
+            taskHeader.className = 'font-bold p-2 border-b border-r border-gray-300 bg-slate-50 sticky left-0 z-30'; // Removed explicit top: calc and let grid handle
+            taskHeader.textContent = 'タスク';
+            container.appendChild(taskHeader);
+
+            // --- Row 2, Column 2: Day Headers (Horizontal scrollable) ---
+            const dayHeadersScrollWrapper = document.createElement('div');
+            dayHeadersScrollWrapper.className = 'overflow-x-auto relative z-20';
             const dayHeadersDiv = document.createElement('div');
             dayHeadersDiv.id = 'gantt-day-headers';
-            dayHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-50 sticky top-0 z-10';
+            dayHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-50';
             dayHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
+            dayHeadersScrollWrapper.appendChild(dayHeadersDiv);
+            container.appendChild(dayHeadersScrollWrapper);
 
-            const ganttBarsArea = document.createElement('div');
-            ganttBarsArea.id = 'gantt-bars-area';
+            // --- Row 3, Column 1: Task Names (Vertical scrollable) ---
+            const taskNamesScrollable = document.createElement('div');
+            taskNamesScrollable.className = 'overflow-y-auto border-r border-gray-300';
+            taskNamesScrollable.id = 'gantt-task-names-scrollable';
+            container.appendChild(taskNamesScrollable);
 
-            timelineColDiv.appendChild(monthHeadersDiv);
-            timelineColDiv.appendChild(dayHeadersDiv);
-            timelineColDiv.appendChild(ganttBarsArea);
+            // --- Row 3, Column 2: Task Bars (Both horizontal and vertical scrollable) ---
+            const barsScrollable = document.createElement('div');
+            barsScrollable.className = 'overflow-x-auto overflow-y-auto';
+            barsScrollable.id = 'gantt-bars-scrollable';
+            container.appendChild(barsScrollable);
 
+            // Synchronize vertical scrolling between task names and bars
+            taskNamesScrollable.addEventListener('scroll', () => {
+                barsScrollable.scrollTop = taskNamesScrollable.scrollTop;
+            });
+            barsScrollable.addEventListener('scroll', () => {
+                taskNamesScrollable.scrollTop = barsScrollable.scrollTop;
+            });
+
+            // Populate Month Headers
             let currentMonth = -1;
             let monthDayCount = 0;
             const monthSpans = [];
@@ -222,7 +250,6 @@
                 if (d.getMonth() !== currentMonth) {
                     if (currentMonth !== -1) {
                         monthSpans.push({
-                            // YYYY年を削除し、M月のみに
                             text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                             span: monthDayCount
                         });
@@ -231,19 +258,9 @@
                     monthDayCount = 0;
                 }
                 monthDayCount++;
-
-                const dayHeader = document.createElement('div');
-                dayHeader.className = `p-1 text-center text-xs border-r border-gray-200 ${d.getDay() === 0 || d.getDay() === 6 ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500'}`;
-                dayHeader.textContent = d.getDate();
-                if (d.getDate() === 1) {
-                    dayHeader.textContent = `${d.getMonth()+1}/${d.getDate()}`;
-                    dayHeader.classList.add('font-bold', 'text-slate-700');
-                }
-                dayHeadersDiv.appendChild(dayHeader);
             }
             if (currentMonth !== -1 && monthDayCount > 0) {
-                 monthSpans.push({
-                    // YYYY年を削除し、M月のみに
+                monthSpans.push({
                     text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                     span: monthDayCount
                 });
@@ -257,15 +274,32 @@
                 monthHeadersDiv.appendChild(monthDiv);
             });
 
+            // Populate Day Headers
+            for (let i = 0; i < totalProjectDays; i++) {
+                const d = new Date(projectStartDate);
+                d.setDate(d.getDate() + i);
+                const dayHeader = document.createElement('div');
+                dayHeader.className = `p-1 text-center text-xs border-r border-gray-200 ${d.getDay() === 0 || d.getDay() === 6 ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500'}`;
+                dayHeader.textContent = d.getDate();
+                if (d.getDate() === 1) {
+                    dayHeader.textContent = `${d.getMonth()+1}/${d.getDate()}`;
+                    dayHeader.classList.add('font-bold', 'text-slate-700');
+                }
+                dayHeadersDiv.appendChild(dayHeader);
+            }
+
+            // Populate Task Names and Bars
             wbsData.forEach(task => {
+                // Task Name (left column, within its scrollable container)
                 const taskLabel = document.createElement('div');
                 taskLabel.className = 'text-sm p-2 border-b whitespace-nowrap overflow-hidden text-ellipsis';
                 taskLabel.textContent = task.name;
-                taskColDiv.appendChild(taskLabel);
+                taskNamesScrollable.appendChild(taskLabel);
 
-                const taskRow = document.createElement('div');
-                taskRow.className = 'relative grid border-b';
-                taskRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, 1fr)`;
+                // Task Bar (right column, within its scrollable container)
+                const taskBarRow = document.createElement('div');
+                taskBarRow.className = 'grid border-b'; // Each bar row is a grid to position the bar
+                taskBarRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, 1fr)`;
 
                 const startOffset = dateDiffInDays(projectStartDate, new Date(task.start));
                 const duration = dateDiffInDays(new Date(task.start), new Date(task.end)) + 1;
@@ -283,12 +317,23 @@
                 bar.addEventListener('mouseover', () => tooltip.style.opacity = 1);
                 bar.addEventListener('mouseout', () => tooltip.style.opacity = 0);
 
-                taskRow.appendChild(bar);
-                ganttBarsArea.appendChild(taskRow);
+                taskBarRow.appendChild(bar);
+                barsScrollable.appendChild(taskBarRow);
             });
 
-            container.appendChild(taskColDiv);
-            container.appendChild(timelineColDiv);
+            // Synchronize horizontal scrolling of header and bars
+            monthHeadersScrollWrapper.addEventListener('scroll', () => {
+                dayHeadersScrollWrapper.scrollLeft = monthHeadersScrollWrapper.scrollLeft;
+                barsScrollable.scrollLeft = monthHeadersScrollWrapper.scrollLeft;
+            });
+            dayHeadersScrollWrapper.addEventListener('scroll', () => {
+                monthHeadersScrollWrapper.scrollLeft = dayHeadersScrollWrapper.scrollLeft;
+                barsScrollable.scrollLeft = dayHeadersScrollWrapper.scrollLeft;
+            });
+            barsScrollable.addEventListener('scroll', () => {
+                monthHeadersScrollWrapper.scrollLeft = barsScrollable.scrollLeft;
+                dayHeadersScrollWrapper.scrollLeft = barsScrollable.scrollLeft;
+            });
         }
 
         function renderKanbanBoard() {
@@ -590,18 +635,76 @@
         }
 
         .gantt-grid {
+            /* Main grid for the entire Gantt chart structure */
             display: grid;
-            grid-template-columns: minmax(150px, 250px) 1fr; /* Responsive task column width */
+            grid-template-columns: minmax(150px, 250px) 1fr; /* Task name col | Timeline col */
+            grid-template-rows: auto auto 1fr; /* Row 1: Month header, Row 2: Day header, Row 3: Task list/bars */
+            height: 60vh; /* Set a height to enable vertical scrolling */
+            max-height: 500px; /* Max height to prevent excessive size */
+            overflow: hidden; /* Hide overflow from the main grid, children will handle scrolling */
         }
-        .gantt-timeline-col {
-            overflow-x: auto; /* This column specifically scrolls horizontally */
-            width: 100%; /* Ensure it takes full available width in its grid cell */
+
+        .gantt-grid > div {
+            /* Basic styling for all direct children of gantt-grid */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
         }
-        .gantt-timeline-col > .grid { /* Apply to month/day headers */
-            min-width: fit-content; /* Ensure grid does not shrink below content */
+
+        /* Top-left placeholder */
+        .gantt-grid > div:nth-child(1) {
+            grid-row: 1 / 2; /* Row 1 */
+            grid-column: 1 / 2; /* Column 1 */
         }
+
+        /* Month Headers Wrapper (Column 2 of Row 1) */
+        .gantt-grid > div:nth-child(2) {
+            grid-row: 1 / 2; /* Row 1 */
+            grid-column: 2 / 3; /* Column 2 */
+            overflow-x: auto; /* Enable horizontal scrolling for month headers */
+            position: relative; /* For z-index context */
+            z-index: 20;
+            border-bottom: 1px solid #e2e8f0; /* Match border-b from monthHeadersDiv */
+        }
+        .gantt-grid > div:nth-child(2) > .grid { /* Inner grid for month headers */
+            min-width: fit-content; /* Prevent content from shrinking */
+            height: 100%; /* Fill parent wrapper height */
+        }
+
+        /* Task Header (Column 1 of Row 2) */
+        .gantt-grid > div:nth-child(3) {
+            grid-row: 2 / 3; /* Row 2 */
+            grid-column: 1 / 2; /* Column 1 */
+        }
+
+        /* Day Headers Wrapper (Column 2 of Row 2) */
+        .gantt-grid > div:nth-child(4) {
+            grid-row: 2 / 3; /* Row 2 */
+            grid-column: 2 / 3; /* Column 2 */
+            overflow-x: auto; /* Enable horizontal scrolling for day headers */
+            position: relative; /* For z-index context */
+            z-index: 20;
+            border-bottom: 1px solid #e2e8f0; /* Match border-b from dayHeadersDiv */
+        }
+        .gantt-grid > div:nth-child(4) > .grid { /* Inner grid for day headers */
+            min-width: fit-content; /* Prevent content from shrinking */
+            height: 100%; /* Fill parent wrapper height */
+        }
+
+        /* Task Names Scrollable (Column 1 of Row 3) */
+        #gantt-task-names-scrollable {
+            grid-row: 3 / 4; /* Row 3 */
+            grid-column: 1 / 2; /* Column 1 */
+            overflow-y: auto; /* Enable vertical scrolling for task names */
+        }
+
+        /* Task Bars Scrollable (Column 2 of Row 3) */
+        #gantt-bars-scrollable {
+            grid-row: 3 / 4; /* Row 3 */
+            grid-column: 2 / 3; /* Column 2 */
+            overflow: auto; /* Enable both horizontal and vertical scrolling for bars */
+        }
+
+
         .gantt-bar {
-            /* color will be set by JS based on status */
             transition: background-color 0.2s;
         }
         .kanban-board {
