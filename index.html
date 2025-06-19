@@ -222,6 +222,7 @@
                 if (d.getMonth() !== currentMonth) {
                     if (currentMonth !== -1) {
                         monthSpans.push({
+                            // YYYY年を削除し、M月のみに
                             text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                             span: monthDayCount
                         });
@@ -242,6 +243,7 @@
             }
             if (currentMonth !== -1 && monthDayCount > 0) {
                  monthSpans.push({
+                    // YYYY年を削除し、M月のみに
                     text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                     span: monthDayCount
                 });
@@ -249,7 +251,7 @@
 
             monthSpans.forEach(spanInfo => {
                 const monthDiv = document.createElement('div');
-                // Added whitespace-nowrap to prevent text wrapping within the month name
+                // whitespace-nowrap を追加し、改行を防ぐ
                 monthDiv.className = `col-span-${spanInfo.span} p-2 text-center font-semibold text-gray-800 bg-gray-200 border-r border-gray-300 whitespace-nowrap`;
                 monthDiv.textContent = spanInfo.text;
                 monthHeadersDiv.appendChild(monthDiv);
