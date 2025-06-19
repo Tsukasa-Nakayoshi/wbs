@@ -222,7 +222,7 @@
                 if (d.getMonth() !== currentMonth) {
                     if (currentMonth !== -1) {
                         monthSpans.push({
-                            text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }), // YYYY年を削除
+                            text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                             span: monthDayCount
                         });
                     }
@@ -242,14 +242,15 @@
             }
             if (currentMonth !== -1 && monthDayCount > 0) {
                  monthSpans.push({
-                    text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }), // YYYY年を削除
+                    text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long' }),
                     span: monthDayCount
                 });
             }
 
             monthSpans.forEach(spanInfo => {
                 const monthDiv = document.createElement('div');
-                monthDiv.className = `col-span-${spanInfo.span} p-2 text-center font-semibold text-gray-800 border-r border-gray-300`;
+                // Added whitespace-nowrap to prevent text wrapping within the month name
+                monthDiv.className = `col-span-${spanInfo.span} p-2 text-center font-semibold text-gray-800 bg-gray-200 border-r border-gray-300 whitespace-nowrap`;
                 monthDiv.textContent = spanInfo.text;
                 monthHeadersDiv.appendChild(monthDiv);
             });
