@@ -137,6 +137,9 @@
             const projectEndDate = new Date(Math.max(...allDates));
             const totalProjectDays = dateDiffInDays(projectStartDate, projectEndDate) + 1;
 
+            // 定義：各日カラムの固定幅（ピクセル）
+            const COLUMN_WIDTH_PX = 40; 
+
             // Main grid for the Gantt chart layout
             container.classList.add('grid', 'grid-cols-[minmax(150px,_250px)_1fr]', 'grid-rows-[auto_auto_1fr]', 'h-[60vh]', 'max-h-[500px]', 'overflow-hidden');
 
@@ -151,7 +154,7 @@
             const monthHeadersDiv = document.createElement('div');
             monthHeadersDiv.id = 'gantt-month-headers';
             monthHeadersDiv.className = 'grid bg-gray-200';
-            monthHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
+            monthHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, ${COLUMN_WIDTH_PX}px)`; // 固定幅を適用
             monthHeadersScrollWrapper.appendChild(monthHeadersDiv);
             container.appendChild(monthHeadersScrollWrapper);
 
@@ -167,7 +170,7 @@
             const dayHeadersDiv = document.createElement('div');
             dayHeadersDiv.id = 'gantt-day-headers';
             dayHeadersDiv.className = 'grid bg-gray-50';
-            dayHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
+            dayHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, ${COLUMN_WIDTH_PX}px)`; // 固定幅を適用
             dayHeadersScrollWrapper.appendChild(dayHeadersDiv);
             container.appendChild(dayHeadersScrollWrapper);
 
@@ -249,7 +252,7 @@
                 // Task Bar (right column, within its scrollable container)
                 const taskBarRow = document.createElement('div');
                 taskBarRow.className = 'grid border-b gantt-row-item';
-                taskBarRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, 1fr)`;
+                taskBarRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, ${COLUMN_WIDTH_PX}px)`; // 固定幅を適用
 
                 const startOffset = dateDiffInDays(projectStartDate, new Date(task.start));
                 const duration = dateDiffInDays(new Date(task.start), new Date(task.end)) + 1;
@@ -261,7 +264,7 @@
 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-10';
-                tooltip.innerHTML = `<strong>${task.name}</strong><br>期間: ${task.start} ~ ${task.end}<br>担当: ${task.person}<br>状態: ${task.status}<br>メモ: ${task.memo || 'なし'}`; // メモを追加
+                tooltip.innerHTML = `<strong>${task.name}</strong><br>期間: ${task.start} ~ ${task.end}<br>担当: ${task.person}<br>状態: ${task.status}<br>メモ: ${task.memo || 'なし'}`;
                 bar.appendChild(tooltip);
 
                 bar.addEventListener('mouseover', () => tooltip.style.opacity = 1);
@@ -308,7 +311,7 @@
                             <div class="bg-white p-3 rounded-md shadow-sm border-l-4 ${statusColors[task.status].bg.replace('bg-', 'border-')}">
                                 <p class="font-medium text-sm">${task.name}</p>
                                 <p class="text-xs text-slate-500 mt-1">${task.person}</p>
-                                <p class="text-xs text-slate-400 mt-1">${task.memo || 'メモなし'}</p> <!-- メモを追加 -->
+                                <p class="text-xs text-slate-400 mt-1">${task.memo || 'メモなし'}</p>
                             </div>
                         `).join('')}
                     </div>
@@ -329,7 +332,7 @@
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-slate-900">${task.name}</div>
-                        <div class="text-sm text-slate-500">${task.memo || ''}</div> <!-- task.phaseをtask.memoに置き換え -->
+                        <div class="text-sm text-slate-500">${task.memo || ''}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${task.person}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${task.start} ~ ${task.end} (${task.duration}日)</td>
@@ -366,35 +369,24 @@
 
         function setupFilters() {
             const persons = [...new Set(wbsData.map(t => t.person))];
-            // phasesフィルターは削除
-            // const phases = [...new Set(wbsData.map(t => t.phase))];
 
             const personFilter = document.getElementById('filter-person');
             personFilter.innerHTML = '<option value="">全担当者</option>';
             persons.forEach(p => personFilter.innerHTML += `<option value="${p}">${p}</option>`);
-
-            // filter-phase要素はHTMLから削除されているため、ここでの参照も不要
-            // const phaseFilter = document.getElementById('filter-phase');
-            // phaseFilter.innerHTML = '<option value="">全フェーズ</option>';
-            // phases.forEach(p => phaseFilter.innerHTML += `<option value="${p}">${p}</option>`);
 
             const searchInput = document.getElementById('search-input');
 
             const applyFilters = () => {
                 const searchTerm = searchInput.value.toLowerCase();
                 const selectedPerson = personFilter.value;
-                // selectedPhaseは削除
-                // const selectedPhase = phaseFilter.value;
 
                 const filtered = wbsData.filter(task =>
                     task.name.toLowerCase().includes(searchTerm) &&
                     (selectedPerson === '' || task.person === selectedPerson)
-                    // && (selectedPhase === '' || task.phase === selectedPhase) // フィルター条件から削除
                 );
                 renderTaskList(filtered);
             };
 
-            // phaseFilterはイベントリスナーから削除
             [searchInput, personFilter].forEach(el => el.addEventListener('input', applyFilters));
         }
 
@@ -418,8 +410,7 @@
             document.getElementById('new-task-person').value = task.person;
             document.getElementById('new-task-start').value = task.start;
             document.getElementById('new-task-end').value = task.end;
-            // new-task-phaseをnew-task-memoに置き換え
-            document.getElementById('new-task-memo').value = task.memo || ''; // メモは必須ではないので|| ''
+            document.getElementById('new-task-memo').value = task.memo || '';
             document.getElementById('new-task-status').value = task.status;
 
             document.getElementById('add-task-modal').classList.remove('hidden');
@@ -446,11 +437,9 @@
             const person = document.getElementById('new-task-person').value;
             const start = document.getElementById('new-task-start').value;
             const end = document.getElementById('new-task-end').value;
-            // new-task-phaseをnew-task-memoに置き換え、requiredではないので必須チェックから外す
             const memo = document.getElementById('new-task-memo').value;
             const status = document.getElementById('new-task-status').value;
 
-            // 必須入力チェックからphase（memo）を外す
             if (!name || !person || !start || !end || !status) {
                 document.getElementById('modal-message').textContent = 'すべての必須項目を入力してください。';
                 document.getElementById('modal-message').classList.remove('hidden');
@@ -475,7 +464,7 @@
                 person: person,
                 start: start,
                 end: end,
-                memo: memo, // phaseをmemoに置き換え
+                memo: memo,
                 status: status,
                 duration: duration
             };
@@ -767,16 +756,12 @@
 
                 <!-- Task List View -->
                 <div id="view-list" class="hidden">
-                    <p class="text-slate-600 mb-4">全タスクを一覧で表示します。担当者やフェーズでの絞り込み、タスク名での検索が可能です。</p>
+                    <p class="text-slate-600 mb-4">全タスクを一覧で表示します。担当者やメモでの絞り込み、タスク名での検索が可能です。</p>
                     <div class="flex flex-wrap gap-4 mb-4">
                         <input id="search-input" type="text" placeholder="タスク名で検索..." class="w-full md:w-auto flex-grow p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
                         <select id="filter-person" class="p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
                             <option value="">全担当者</option>
                         </select>
-                        <!-- フェーズフィルターを削除 -->
-                        <!-- <select id="filter-phase" class="p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
-                            <option value="">全フェーズ</option>
-                        </select> -->
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-slate-200">
@@ -838,8 +823,8 @@
                         </div>
                     </div>
                     <div>
-                        <label for="new-task-memo" class="block text-sm font-medium text-slate-700">メモ</label> <!-- フェーズをメモに変更 -->
-                        <input type="text" id="new-task-memo" class="mt-1 block w-full p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500"> <!-- required属性を削除 -->
+                        <label for="new-task-memo" class="block text-sm font-medium text-slate-700">メモ</label>
+                        <input type="text" id="new-task-memo" class="mt-1 block w-full p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
                     </div>
                     <div>
                         <label for="new-task-status" class="block text-sm font-medium text-slate-700">状態</label>
