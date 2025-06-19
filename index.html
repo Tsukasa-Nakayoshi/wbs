@@ -11,7 +11,7 @@
         - Status Breakdown: (REMOVED) -> Replaced by calculated progress based on days.
         - Project Timeline: Change -> Custom Gantt Chart -> Hover tooltips on bars -> Best visualization for schedules and dependencies -> Custom JS/HTML/CSS.
         - Task Status Board: Organize -> Kanban-style columns/cards -> Non-interactive -> Intuitive way to view workflow stages -> HTML/Tailwind.
-        - Detailed Task List: Organize/Inform -> Filterable/Searchable Table -> Dropdown filters, text search, Edit/Delete buttons -> Provides deep-dive capability and granular data access -> Custom JS/HTML.
+        - Detailed Task List: Organize/Inform -> Filterable/Searchable Table -> Drag & Drop for reordering, Dropdown filters, text search, Edit/Delete buttons -> Provides deep-dive capability and granular data access -> Custom JS/HTML.
         - Add/Edit Task Form: Collect -> Modal Form -> User input for new/existing tasks -> HTML/Tailwind/JS.
         - Delete Confirmation: Confirm -> Modal -> Prevent accidental deletion -> HTML/Tailwind/JS.
     -->
@@ -45,6 +45,10 @@
         // For task editing
         let currentEditingTaskId = null;
 
+        // For drag and drop
+        let draggedItem = null; // Stores the <tr> element being dragged
+        let dragOverElement = null; // Stores the <tr> element currently being dragged over
+
         // --- Local Storage Functions ---
         function loadTasksFromLocalStorage() {
             try {
@@ -53,7 +57,7 @@
                     wbsData = JSON.parse(storedData);
                     // Ensure 'id' field for existing tasks for editing/deletion
                     wbsData = wbsData.map(task => ({ ...task, id: task.id || crypto.randomUUID() }));
-                    // Sort data by start date for consistent display
+                    // Initial sort by start date, but subsequent reordering will be manual
                     wbsData.sort((a, b) => {
                         const dateA = new Date(a.start);
                         const dateB = new Date(b.start);
@@ -79,7 +83,7 @@
                 console.error("Error saving tasks to local storage:", e);
                 // In a real app, provide user feedback here
             }
-            updateUI(); // Render UI after saving
+            // updateUI() is called after saveTasksToLocalStorage in event handlers, no need to call here
         }
 
         // --- UI Update Function (all renders consolidated) ---
@@ -87,8 +91,8 @@
             renderMetrics();
             renderGanttChart();
             renderKanbanBoard();
-            renderTaskList();
-            setupFilters();
+            renderTaskList(); // Call renderTaskList last as it sets up drag/drop listeners
+            setupFilters(); // Filters need to be set up on current wbsData
         }
 
         // --- Render Functions ---
@@ -327,8 +331,12 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">該当するタスクはありません。</td></tr>`;
                 return;
             }
+
             filteredData.forEach(task => {
                 const row = document.createElement('tr');
+                row.draggable = true; // Make row draggable
+                row.dataset.taskId = task.id; // Store task ID in data attribute
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-slate-900">${task.name}</div>
@@ -349,6 +357,7 @@
                 tbody.appendChild(row);
             });
 
+            // Add event listeners for edit and delete buttons after rendering
             document.querySelectorAll('.edit-task-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
                     const taskId = event.target.dataset.taskId;
@@ -365,6 +374,72 @@
                     showDeleteConfirmModal(taskId);
                 });
             });
+
+            // --- Drag and Drop Event Listeners ---
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('dragleave', handleDragLeave);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        // --- Drag and Drop Handlers ---
+        function handleDragStart(e) {
+            draggedItem = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.taskId); // Pass task ID
+            this.classList.add('opacity-50', 'border-amber-500'); // Visual feedback for dragged item
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Necessary to allow drop
+            e.dataTransfer.dropEffect = 'move';
+
+            if (this !== draggedItem && this.tagName === 'TR') {
+                if (dragOverElement && dragOverElement !== this) {
+                    dragOverElement.classList.remove('border-b-2', 'border-amber-500');
+                }
+                this.classList.add('border-b-2', 'border-amber-500'); // Visual indicator for drop target
+                dragOverElement = this;
+            }
+        }
+
+        function handleDragLeave() {
+            if (dragOverElement) {
+                dragOverElement.classList.remove('border-b-2', 'border-amber-500');
+                dragOverElement = null;
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (this !== draggedItem && this.tagName === 'TR') {
+                const draggedTaskId = e.dataTransfer.getData('text/plain');
+                const droppedTaskId = this.dataset.taskId;
+
+                const draggedTaskIndex = wbsData.findIndex(task => task.id === draggedTaskId);
+                const droppedTaskIndex = wbsData.findIndex(task => task.id === droppedTaskId);
+
+                if (draggedTaskIndex !== -1 && droppedTaskIndex !== -1) {
+                    const [removed] = wbsData.splice(draggedTaskIndex, 1); // Remove dragged item
+                    wbsData.splice(droppedTaskIndex, 0, removed); // Insert at new position
+
+                    saveTasksToLocalStorage(); // Save new order and re-render UI
+                }
+            }
+            handleDragLeave(); // Clean up drop indicator
+        }
+
+        function handleDragEnd() {
+            this.classList.remove('opacity-50', 'border-amber-500'); // Clean up dragged item styling
+            if (dragOverElement) {
+                dragOverElement.classList.remove('border-b-2', 'border-amber-500');
+            }
+            draggedItem = null;
+            dragOverElement = null;
         }
 
         function setupFilters() {
@@ -459,7 +534,7 @@
             const duration = dateDiffInDays(startDate, endDate) + 1;
 
             const taskData = {
-                id: currentEditingTaskId || crypto.randomUUID(),
+                id: currentEditingTaskId || crypto.randomUUID(), // Generate new ID if adding
                 name: name,
                 person: person,
                 start: start,
@@ -488,7 +563,7 @@
             document.getElementById('modal-message').classList.remove('hidden');
             document.getElementById('modal-message').classList.add('text-green-600');
 
-            saveTasksToLocalStorage();
+            saveTasksToLocalStorage(); // Save to local storage after modification
 
             setTimeout(() => {
                 hideAddTaskModal();
@@ -514,7 +589,7 @@
             if (!taskIdToDelete) return;
 
             wbsData = wbsData.filter(task => task.id !== taskIdToDelete);
-            saveTasksToLocalStorage();
+            saveTasksToLocalStorage(); // Save to local storage after deletion
 
             hideDeleteConfirmModal();
         }
