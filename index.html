@@ -32,6 +32,7 @@
         let db;
         let auth;
         let userId = 'anonymous'; // Default to anonymous until authenticated
+        let isFirebaseReady = false; // New flag to track Firebase readiness
 
         let wbsData = []; // Will be populated by Firestore
 
@@ -367,17 +368,25 @@
         async function handleAddTask(event) {
             event.preventDefault(); // Prevent default form submission
 
+            // Clear previous messages
+            document.getElementById('modal-message').textContent = '';
+            document.getElementById('modal-message').classList.add('hidden');
+            document.getElementById('modal-message').classList.remove('text-red-600', 'text-green-600');
+
+            // Check if Firebase is ready before proceeding
+            if (!isFirebaseReady) {
+                document.getElementById('modal-message').textContent = 'システムエラー: 認証またはデータベースの準備ができていません。しばらくお待ちください。';
+                document.getElementById('modal-message').classList.remove('hidden');
+                document.getElementById('modal-message').classList.add('text-red-600');
+                return;
+            }
+
             const name = document.getElementById('new-task-name').value;
             const person = document.getElementById('new-task-person').value;
             const start = document.getElementById('new-task-start').value;
             const end = document.getElementById('new-task-end').value;
             const phase = document.getElementById('new-task-phase').value;
             const status = document.getElementById('new-task-status').value;
-
-            // Clear previous messages
-            document.getElementById('modal-message').textContent = '';
-            document.getElementById('modal-message').classList.add('hidden');
-            document.getElementById('modal-message').classList.remove('text-red-600', 'text-green-600');
 
             if (!name || !person || !start || !end || !phase || !status) {
                 document.getElementById('modal-message').textContent = 'すべての項目を入力してください。';
@@ -408,15 +417,6 @@
             };
 
             try {
-                // Ensure db and userId are available
-                if (!db || !userId || userId === 'anonymous') {
-                    console.error("Firebase not fully initialized or user not authenticated.");
-                    document.getElementById('modal-message').textContent = 'システムエラー: 認証またはデータベースの準備ができていません。';
-                    document.getElementById('modal-message').classList.remove('hidden');
-                    document.getElementById('modal-message').classList.add('text-red-600');
-                    return;
-                }
-
                 const tasksColRef = collection(db, `artifacts/${appId}/users/${userId}/wbs_tasks`);
                 await addDoc(tasksColRef, newTask);
                 document.getElementById('modal-message').textContent = 'タスクが正常に追加されました！';
@@ -432,7 +432,9 @@
                 console.error("Error adding document: ", e);
                 let errorMessage = 'タスクの追加中にエラーが発生しました。';
                 if (e.code === 'permission-denied') {
-                    errorMessage = 'エラー: Firestoreのセキュリティルールによりタスクを追加できません。Firestoreのコンソールでセキュリティルールを確認し、書き込み権限があるか確認してください。';
+                    errorMessage = 'エラー: Firestoreのセキュリティルールによりタスクを追加できません。FirebaseコンソールのFirestoreルールを確認し、書き込み権限があるか確認してください。';
+                } else if (e.code === 'unavailable') {
+                    errorMessage = 'エラー: データベースに接続できません。インターネット接続を確認してください。';
                 }
                 document.getElementById('modal-message').textContent = errorMessage;
                 document.getElementById('modal-message').classList.remove('hidden');
@@ -474,38 +476,62 @@
             db = getFirestore(app);
             auth = getAuth(app);
 
-            document.getElementById('user-id-display').textContent = '認証中...';
+            const userIdDisplay = document.getElementById('user-id-display');
+            const addTaskButton = document.getElementById('add-task-btn');
+
+            userIdDisplay.textContent = '認証中...';
+            addTaskButton.disabled = true; // Disable button initially
 
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
+                    isFirebaseReady = true; // Set flag to true when authenticated
+                    userIdDisplay.textContent = `ユーザーID: ${userId} (準備完了)`;
+                    addTaskButton.disabled = false; // Enable button
                 } else {
                     try {
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
-                            userId = auth.currentUser.uid; // Update userId after custom token sign-in
+                            userId = auth.currentUser.uid;
                         } else {
                             await signInAnonymously(auth);
-                            userId = auth.currentUser.uid; // Update userId after anonymous sign-in
+                            userId = auth.currentUser.uid;
                         }
+                        isFirebaseReady = true; // Set flag to true after successful sign-in
+                        userIdDisplay.textContent = `ユーザーID: ${userId} (準備完了)`;
+                        addTaskButton.disabled = false; // Enable button
                     } catch (error) {
                         console.error("Authentication error:", error);
-                        // Fallback to a random ID if authentication fails, but log error
-                        userId = 'anon-' + crypto.randomUUID();
+                        userId = '認証エラー'; // Indicate authentication failure
+                        userIdDisplay.textContent = `認証エラー: ${error.message || '不明なエラー'}`;
+                        isFirebaseReady = false; // Keep flag false on auth error
+                        addTaskButton.disabled = true; // Keep button disabled
                     }
                 }
-                document.getElementById('user-id-display').textContent = `ユーザーID: ${userId}`;
                 initializeFirestoreListener();
             });
         });
 
         function initializeFirestoreListener() {
+            // Only proceed if Firebase is confirmed ready
+            if (!isFirebaseReady) {
+                console.warn("Firestore listener not initialized: Firebase not ready.");
+                return;
+            }
             const tasksColRef = collection(db, `artifacts/${appId}/users/${userId}/wbs_tasks`);
 
             onSnapshot(tasksColRef, (snapshot) => {
                 wbsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 // Sort data by start date for consistent display
-                wbsData.sort((a, b) => new Date(a.start) - new Date(b.start));
+                wbsData.sort((a, b) => {
+                    const dateA = new Date(a.start);
+                    const dateB = new Date(b.start);
+                    // If start dates are the same, sort by end date
+                    if (dateA.getTime() === dateB.getTime()) {
+                        return new Date(a.end) - new Date(b.end);
+                    }
+                    return dateA - dateB;
+                });
 
                 renderMetrics();
                 renderGanttChart();
@@ -514,9 +540,15 @@
                 setupFilters();
             }, (error) => {
                 console.error("Firestore snapshot error:", error);
-                document.getElementById('gantt-chart-container').innerHTML = '<div class="text-center py-8 text-red-500">データ取得中にエラーが発生しました。</div>';
-                document.getElementById('kanban-board-container').innerHTML = '<div class="text-center py-8 text-red-500">データ取得中にエラーが発生しました。</div>';
-                document.getElementById('task-list-body').innerHTML = '<tr><td colspan="4" class="text-center py-8 text-red-500">データ取得中にエラーが発生しました。</td></tr>';
+                let errorMessage = 'データ取得中にエラーが発生しました。';
+                if (error.code === 'permission-denied') {
+                    errorMessage = 'エラー: Firestoreのセキュリティルールによりデータを読み込めません。コンソールでセキュリティルールを確認してください。';
+                } else if (error.code === 'unavailable') {
+                    errorMessage = 'エラー: データベースに接続できません。インターネット接続を確認してください。';
+                }
+                document.getElementById('gantt-chart-container').innerHTML = `<div class="text-center py-8 text-red-500">${errorMessage}</div>`;
+                document.getElementById('kanban-board-container').innerHTML = `<div class="text-center py-8 text-red-500">${errorMessage}</div>`;
+                document.getElementById('task-list-body').innerHTML = `<tr><td colspan="4" class="text-center py-8 text-red-500">${errorMessage}</td></tr>`;
             });
         }
 
@@ -682,7 +714,7 @@
             
             <!-- Add Task Button -->
             <div class="mt-6 text-center">
-                <button id="add-task-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors duration-200 flex items-center justify-center mx-auto">
+                <button id="add-task-btn" disabled class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors duration-200 flex items-center justify-center mx-auto disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                     新しいタスクを追加
                 </button>
