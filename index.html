@@ -149,71 +149,91 @@
             const projectEndDate = new Date(Math.max(...allDates));
             const totalProjectDays = dateDiffInDays(projectStartDate, projectEndDate) + 1;
 
-            const taskColumn = document.createElement('div');
-            const timelineColumn = document.createElement('div');
-            timelineColumn.className = 'gantt-timeline';
-            timelineColumn.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
+            // Create main grid structure for Gantt chart
+            const taskColDiv = document.createElement('div');
+            taskColDiv.className = 'gantt-task-col'; // Left column for task names
+            const timelineColDiv = document.createElement('div');
+            timelineColDiv.className = 'gantt-timeline-col overflow-x-auto'; // Right column for timeline and bars
 
+            // Task Header for the left column
             const taskHeader = document.createElement('div');
-            taskHeader.className = 'font-bold p-2 border-b bg-slate-50 sticky top-0';
+            taskHeader.className = 'font-bold p-2 border-b bg-slate-50 sticky top-0 z-10';
             taskHeader.textContent = 'タスク';
-            taskColumn.appendChild(taskHeader);
+            taskColDiv.appendChild(taskHeader);
 
-            // Month/Day headers for Gantt chart
-            const dateHeadersRow = document.createElement('div');
-            dateHeadersRow.className = 'grid col-span-full border-b border-gray-300';
-            dateHeadersRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
-            timelineColumn.appendChild(dateHeadersRow);
+            // Month Headers for the timeline column
+            const monthHeadersDiv = document.createElement('div');
+            monthHeadersDiv.id = 'gantt-month-headers';
+            monthHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-200 sticky top-0 z-10';
+            monthHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`; // Set grid columns
 
+            // Day Headers for the timeline column
+            const dayHeadersDiv = document.createElement('div');
+            dayHeadersDiv.id = 'gantt-day-headers';
+            dayHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-50 sticky top-0 z-10';
+            dayHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`; // Set grid columns
+
+            // Area for task bars in the timeline column
+            const ganttBarsArea = document.createElement('div');
+            ganttBarsArea.id = 'gantt-bars-area';
+
+            // Append header and bar areas to the timeline column
+            timelineColDiv.appendChild(monthHeadersDiv);
+            timelineColDiv.appendChild(dayHeadersDiv);
+            timelineColDiv.appendChild(ganttBarsArea);
+
+            // Calculate and populate month headers
             let currentMonth = -1;
-            let currentMonthStartDay = 0;
-            let monthLabelsAdded = 0;
+            let monthDayCount = 0;
+            const monthSpans = [];
 
             for (let i = 0; i < totalProjectDays; i++) {
                 const d = new Date(projectStartDate);
                 d.setDate(d.getDate() + i);
 
-                // Add month header if new month starts
                 if (d.getMonth() !== currentMonth) {
                     if (currentMonth !== -1) {
-                         const prevMonthDuration = i - currentMonthStartDay;
-                         if (prevMonthDuration > 0) {
-                            const monthHeaderDiv = document.createElement('div');
-                            monthHeaderDiv.className = `col-span-${prevMonthDuration} p-2 text-center font-semibold text-gray-800 bg-gray-200 border-r border-gray-300`;
-                            monthHeaderDiv.textContent = new Date(projectStartDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' });
-                            dateHeadersRow.insertBefore(monthHeaderDiv, dateHeadersRow.children[monthLabelsAdded]);
-                            monthLabelsAdded++;
-                         }
+                        monthSpans.push({
+                            text: new Date(d.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' }),
+                            span: monthDayCount
+                        });
                     }
                     currentMonth = d.getMonth();
-                    currentMonthStartDay = i;
+                    monthDayCount = 0;
                 }
+                monthDayCount++;
 
                 const dayHeader = document.createElement('div');
-                dayHeader.className = `text-center text-xs p-1 border-b border-r bg-slate-50 text-slate-500`;
-                if (d.getDate() === 1) {
+                dayHeader.className = `p-1 text-center text-xs border-r border-gray-200 ${d.getDay() === 0 || d.getDay() === 6 ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500'}`;
+                dayHeader.textContent = d.getDate(); // Only show day number
+                if (d.getDate() === 1) { // Show month/day for the 1st of each month
                     dayHeader.textContent = `${d.getMonth()+1}/${d.getDate()}`;
                     dayHeader.classList.add('font-bold', 'text-slate-700');
-                } else {
-                     dayHeader.textContent = d.getDate();
                 }
-                dateHeadersRow.appendChild(dayHeader);
+                dayHeadersDiv.appendChild(dayHeader);
             }
-            // Add last month header
-            const lastMonthDuration = totalProjectDays - currentMonthStartDay;
-            if (lastMonthDuration > 0) {
-                const monthHeaderDiv = document.createElement('div');
-                monthHeaderDiv.className = `col-span-${lastMonthDuration} p-2 text-center font-semibold text-gray-800 bg-gray-200 border-r border-gray-300`;
-                monthHeaderDiv.textContent = new Date(projectStartDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' });
-                dateHeadersRow.insertBefore(monthHeaderDiv, dateHeadersRow.children[monthLabelsAdded]);
+            // Add the last month's span
+            if (currentMonth !== -1 && monthDayCount > 0) {
+                 monthSpans.push({
+                    text: new Date(projectEndDate.getFullYear(), currentMonth, 1).toLocaleString('ja-JP', { month: 'long', year: 'numeric' }),
+                    span: monthDayCount
+                });
             }
 
+            monthSpans.forEach(spanInfo => {
+                const monthDiv = document.createElement('div');
+                monthDiv.className = `col-span-${spanInfo.span} p-2 text-center font-semibold text-gray-800 border-r border-gray-300`;
+                monthDiv.textContent = spanInfo.text;
+                monthHeadersDiv.appendChild(monthDiv);
+            });
 
+
+            // Render Tasks and Bars
             wbsData.forEach(task => {
                 const taskLabel = document.createElement('div');
                 taskLabel.className = 'text-sm p-2 border-b whitespace-nowrap overflow-hidden text-ellipsis';
                 taskLabel.textContent = task.name;
-                taskColumn.appendChild(taskLabel);
+                taskColDiv.appendChild(taskLabel);
 
                 const taskRow = document.createElement('div');
                 taskRow.className = 'relative grid border-b';
@@ -225,6 +245,8 @@
                 const bar = document.createElement('div');
                 bar.className = 'gantt-bar h-6 my-1 rounded flex items-center justify-start px-2 text-white text-xs relative';
                 bar.style.gridColumn = `${startOffset + 1} / span ${duration}`;
+                // Apply status color directly
+                bar.style.backgroundColor = statusChartColors[task.status] || '#a0aec0'; // Default to gray if status not found
 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-10';
@@ -235,11 +257,11 @@
                 bar.addEventListener('mouseout', () => tooltip.style.opacity = 0);
 
                 taskRow.appendChild(bar);
-                timelineColumn.appendChild(taskRow);
+                ganttBarsArea.appendChild(taskRow); // Append to ganttBarsArea
             });
 
-            container.appendChild(taskColumn);
-            container.appendChild(timelineColumn);
+            container.appendChild(taskColDiv);
+            container.appendChild(timelineColDiv);
         }
 
         function renderKanbanBoard() {
@@ -332,12 +354,14 @@
         function showAddTaskModal() {
             document.getElementById('add-task-modal').classList.remove('hidden');
             document.getElementById('modal-overlay').classList.remove('hidden');
+            document.getElementById('modal-message').classList.add('hidden'); // Hide message on modal open
         }
 
         function hideAddTaskModal() {
             document.getElementById('add-task-modal').classList.add('hidden');
             document.getElementById('modal-overlay').classList.add('hidden');
             document.getElementById('add-task-form').reset(); // Reset form fields
+            document.getElementById('modal-message').classList.add('hidden'); // Ensure message is hidden
         }
 
         async function handleAddTask(event) {
@@ -350,17 +374,24 @@
             const phase = document.getElementById('new-task-phase').value;
             const status = document.getElementById('new-task-status').value;
 
+            // Clear previous messages
+            document.getElementById('modal-message').textContent = '';
+            document.getElementById('modal-message').classList.add('hidden');
+            document.getElementById('modal-message').classList.remove('text-red-600', 'text-green-600');
+
             if (!name || !person || !start || !end || !phase || !status) {
-                // Using alert for simplicity, would replace with custom modal or in-page message
-                console.error('すべての項目を入力してください。');
+                document.getElementById('modal-message').textContent = 'すべての項目を入力してください。';
+                document.getElementById('modal-message').classList.remove('hidden');
+                document.getElementById('modal-message').classList.add('text-red-600');
                 return;
             }
 
             const startDate = new Date(start);
             const endDate = new Date(end);
             if (startDate > endDate) {
-                // Using alert for simplicity, would replace with custom modal or in-page message
-                console.error('終了日は開始日以降に設定してください。');
+                document.getElementById('modal-message').textContent = '終了日は開始日以降に設定してください。';
+                document.getElementById('modal-message').classList.remove('hidden');
+                document.getElementById('modal-message').classList.add('text-red-600');
                 return;
             }
 
@@ -377,13 +408,35 @@
             };
 
             try {
+                // Ensure db and userId are available
+                if (!db || !userId || userId === 'anonymous') {
+                    console.error("Firebase not fully initialized or user not authenticated.");
+                    document.getElementById('modal-message').textContent = 'システムエラー: 認証またはデータベースの準備ができていません。';
+                    document.getElementById('modal-message').classList.remove('hidden');
+                    document.getElementById('modal-message').classList.add('text-red-600');
+                    return;
+                }
+
                 const tasksColRef = collection(db, `artifacts/${appId}/users/${userId}/wbs_tasks`);
                 await addDoc(tasksColRef, newTask);
-                hideAddTaskModal();
+                document.getElementById('modal-message').textContent = 'タスクが正常に追加されました！';
+                document.getElementById('modal-message').classList.remove('hidden');
+                document.getElementById('modal-message').classList.add('text-green-600');
+
+                // Close modal after a short delay for success message visibility
+                setTimeout(() => {
+                    hideAddTaskModal();
+                }, 1500);
+
             } catch (e) {
                 console.error("Error adding document: ", e);
-                // Using alert for simplicity
-                console.error("タスクの追加中にエラーが発生しました。");
+                let errorMessage = 'タスクの追加中にエラーが発生しました。';
+                if (e.code === 'permission-denied') {
+                    errorMessage = 'エラー: Firestoreのセキュリティルールによりタスクを追加できません。Firestoreのコンソールでセキュリティルールを確認し、書き込み権限があるか確認してください。';
+                }
+                document.getElementById('modal-message').textContent = errorMessage;
+                document.getElementById('modal-message').classList.remove('hidden');
+                document.getElementById('modal-message').classList.add('text-red-600');
             }
         }
 
@@ -468,6 +521,55 @@
         }
 
     </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .tab-active {
+            border-color: #f59e0b; /* amber-500 */
+            color: #f59e0b; /* amber-500 */
+            background-color: #fffbeb; /* amber-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%; /* Take full width of parent column */
+            max-width: 400px; /* Limit max width on larger screens */
+            margin-left: auto;
+            margin-right: auto; /* Center it */
+            height: 250px; /* Base height */
+            max-height: 350px; /* Max height */
+        }
+        /* Adjust for smaller screens if needed */
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 200px;
+                max-height: 250px;
+            }
+        }
+
+        .gantt-grid {
+            display: grid;
+            grid-template-columns: minmax(150px, 250px) 1fr; /* Responsive task column width */
+        }
+        .gantt-timeline-col {
+            overflow-x: auto; /* This column specifically scrolls horizontally */
+            width: 100%; /* Ensure it takes full available width in its grid cell */
+        }
+        .gantt-timeline-col > .grid { /* Apply to month/day headers */
+            min-width: fit-content; /* Ensure grid does not shrink below content */
+        }
+        .gantt-bar {
+            /* color will be set by JS based on status */
+            transition: background-color 0.2s;
+        }
+        .kanban-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+    </style>
 </head>
 <body class="text-slate-700">
 
@@ -513,7 +615,7 @@
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm">
                 <p class="text-sm text-slate-500 text-center mb-2">ステータス別タスク</p>
-                <div class="chart-container h-48 max-h-48 w-48 max-w-48">
+                <div class="chart-container">
                     <canvas id="status-chart"></canvas>
                 </div>
             </div>
@@ -599,6 +701,7 @@
                     </button>
                 </div>
                 <form id="add-task-form" class="space-y-4">
+                    <div id="modal-message" class="hidden p-3 rounded-md text-sm font-medium"></div>
                     <div>
                         <label for="new-task-name" class="block text-sm font-medium text-slate-700">タスク名</label>
                         <input type="text" id="new-task-name" required class="mt-1 block w-full p-2 border border-slate-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
