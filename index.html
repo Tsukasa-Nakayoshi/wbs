@@ -189,44 +189,42 @@
 
             // --- Row 1, Column 1: Top-left placeholder ---
             const topLeftPlaceholder = document.createElement('div');
-            topLeftPlaceholder.className = 'font-bold p-2 border-b border-r border-gray-300 bg-slate-50 sticky top-0 left-0 z-30';
+            topLeftPlaceholder.className = 'font-bold p-2 bg-slate-50 sticky top-0 left-0 z-30';
             container.appendChild(topLeftPlaceholder);
 
             // --- Row 1, Column 2: Month Headers (Horizontal scrollable) ---
             const monthHeadersScrollWrapper = document.createElement('div');
-            monthHeadersScrollWrapper.className = 'overflow-x-auto relative z-20';
+            monthHeadersScrollWrapper.className = 'relative z-20';
             const monthHeadersDiv = document.createElement('div');
             monthHeadersDiv.id = 'gantt-month-headers';
-            monthHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-200';
+            monthHeadersDiv.className = 'grid bg-gray-200';
             monthHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
             monthHeadersScrollWrapper.appendChild(monthHeadersDiv);
             container.appendChild(monthHeadersScrollWrapper);
 
             // --- Row 2, Column 1: Task Header (Sticky) ---
             const taskHeader = document.createElement('div');
-            taskHeader.className = 'font-bold p-2 border-b border-r border-gray-300 bg-slate-50 sticky left-0 z-30'; // Removed explicit top: calc and let grid handle
+            taskHeader.className = 'font-bold p-2 bg-slate-50 sticky left-0 z-30';
             taskHeader.textContent = 'タスク';
             container.appendChild(taskHeader);
 
             // --- Row 2, Column 2: Day Headers (Horizontal scrollable) ---
             const dayHeadersScrollWrapper = document.createElement('div');
-            dayHeadersScrollWrapper.className = 'overflow-x-auto relative z-20';
+            dayHeadersScrollWrapper.className = 'relative z-20';
             const dayHeadersDiv = document.createElement('div');
             dayHeadersDiv.id = 'gantt-day-headers';
-            dayHeadersDiv.className = 'grid border-b border-gray-300 bg-gray-50';
+            dayHeadersDiv.className = 'grid bg-gray-50';
             dayHeadersDiv.style.gridTemplateColumns = `repeat(${totalProjectDays}, minmax(30px, 1fr))`;
             dayHeadersScrollWrapper.appendChild(dayHeadersDiv);
             container.appendChild(dayHeadersScrollWrapper);
 
             // --- Row 3, Column 1: Task Names (Vertical scrollable) ---
             const taskNamesScrollable = document.createElement('div');
-            taskNamesScrollable.className = 'overflow-y-auto border-r border-gray-300';
             taskNamesScrollable.id = 'gantt-task-names-scrollable';
             container.appendChild(taskNamesScrollable);
 
             // --- Row 3, Column 2: Task Bars (Both horizontal and vertical scrollable) ---
             const barsScrollable = document.createElement('div');
-            barsScrollable.className = 'overflow-x-auto overflow-y-auto';
             barsScrollable.id = 'gantt-bars-scrollable';
             container.appendChild(barsScrollable);
 
@@ -268,7 +266,6 @@
 
             monthSpans.forEach(spanInfo => {
                 const monthDiv = document.createElement('div');
-                // whitespace-nowrap を追加し、改行を防ぐ
                 monthDiv.className = `col-span-${spanInfo.span} p-2 text-center font-semibold text-gray-800 bg-gray-200 border-r border-gray-300 whitespace-nowrap`;
                 monthDiv.textContent = spanInfo.text;
                 monthHeadersDiv.appendChild(monthDiv);
@@ -292,13 +289,13 @@
             wbsData.forEach(task => {
                 // Task Name (left column, within its scrollable container)
                 const taskLabel = document.createElement('div');
-                taskLabel.className = 'text-sm p-2 border-b whitespace-nowrap overflow-hidden text-ellipsis';
+                taskLabel.className = 'text-sm p-2 border-b whitespace-nowrap overflow-hidden text-ellipsis gantt-row-item';
                 taskLabel.textContent = task.name;
                 taskNamesScrollable.appendChild(taskLabel);
 
                 // Task Bar (right column, within its scrollable container)
                 const taskBarRow = document.createElement('div');
-                taskBarRow.className = 'grid border-b'; // Each bar row is a grid to position the bar
+                taskBarRow.className = 'grid border-b gantt-row-item';
                 taskBarRow.style.gridTemplateColumns = `repeat(${totalProjectDays}, 1fr)`;
 
                 const startOffset = dateDiffInDays(projectStartDate, new Date(task.start));
@@ -642,6 +639,8 @@
             height: 60vh; /* Set a height to enable vertical scrolling */
             max-height: 500px; /* Max height to prevent excessive size */
             overflow: hidden; /* Hide overflow from the main grid, children will handle scrolling */
+            border: 1px solid #e2e8f0; /* Add overall border for visual cohesion */
+            border-radius: 0.5rem; /* Rounded corners */
         }
 
         .gantt-grid > div {
@@ -653,19 +652,21 @@
         .gantt-grid > div:nth-child(1) {
             grid-row: 1 / 2; /* Row 1 */
             grid-column: 1 / 2; /* Column 1 */
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
         }
 
         /* Month Headers Wrapper (Column 2 of Row 1) */
         .gantt-grid > div:nth-child(2) {
             grid-row: 1 / 2; /* Row 1 */
             grid-column: 2 / 3; /* Column 2 */
-            overflow-x: auto; /* Enable horizontal scrolling for month headers */
+            overflow-x: hidden; /* Hide scrollbar here */
             position: relative; /* For z-index context */
             z-index: 20;
-            border-bottom: 1px solid #e2e8f0; /* Match border-b from monthHeadersDiv */
+            border-bottom: 1px solid #e2e8f0;
         }
         .gantt-grid > div:nth-child(2) > .grid { /* Inner grid for month headers */
-            min-width: fit-content; /* Prevent content from shrinking */
+            min-width: max-content; /* Allow content to dictate width */
             height: 100%; /* Fill parent wrapper height */
         }
 
@@ -673,19 +674,21 @@
         .gantt-grid > div:nth-child(3) {
             grid-row: 2 / 3; /* Row 2 */
             grid-column: 1 / 2; /* Column 1 */
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
         }
 
         /* Day Headers Wrapper (Column 2 of Row 2) */
         .gantt-grid > div:nth-child(4) {
             grid-row: 2 / 3; /* Row 2 */
             grid-column: 2 / 3; /* Column 2 */
-            overflow-x: auto; /* Enable horizontal scrolling for day headers */
+            overflow-x: hidden; /* Hide scrollbar here */
             position: relative; /* For z-index context */
             z-index: 20;
-            border-bottom: 1px solid #e2e8f0; /* Match border-b from dayHeadersDiv */
+            border-bottom: 1px solid #e2e8f0;
         }
         .gantt-grid > div:nth-child(4) > .grid { /* Inner grid for day headers */
-            min-width: fit-content; /* Prevent content from shrinking */
+            min-width: max-content; /* Allow content to dictate width */
             height: 100%; /* Fill parent wrapper height */
         }
 
@@ -694,6 +697,7 @@
             grid-row: 3 / 4; /* Row 3 */
             grid-column: 1 / 2; /* Column 1 */
             overflow-y: auto; /* Enable vertical scrolling for task names */
+            border-right: 1px solid #e2e8f0; /* Maintain right border */
         }
 
         /* Task Bars Scrollable (Column 2 of Row 3) */
@@ -703,9 +707,24 @@
             overflow: auto; /* Enable both horizontal and vertical scrolling for bars */
         }
 
+        /* Consistent row height for elements inside scrollable areas */
+        /* This class is applied to both task labels and task bar containers in JS */
+        .gantt-row-item {
+            height: 40px; /* Consistent height for each logical row */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+            display: flex; /* Use flexbox for vertical centering */
+            align-items: center; /* Center content vertically */
+        }
+        #gantt-task-names-scrollable .gantt-row-item {
+            padding-left: 0.5rem; /* Add some padding for task names */
+            padding-right: 0.5rem;
+        }
 
-        .gantt-bar {
-            transition: background-color 0.2s;
+        #gantt-bars-scrollable .gantt-bar {
+            /* Bars themselves can be slightly smaller than the row item to give some visual padding */
+            height: 32px; /* Smaller than 40px row-item height */
+            margin-top: 4px; /* Vertically center within the 40px row-item */
+            margin-bottom: 4px;
         }
         .kanban-board {
             display: grid;
