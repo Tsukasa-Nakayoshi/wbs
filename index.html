@@ -8,7 +8,7 @@
     <!-- Application Structure Plan: A dashboard-style SPA with three main views: 1) A Timeline (Gantt Chart) for chronological understanding, 2) A Task Board (Kanban) for status tracking, and 3) A Detailed List for granular filtering and searching. This structure provides multiple perspectives on the same data. Tab-based navigation makes switching between these analytical views seamless and intuitive. Data persistence is handled via browser's LocalStorage, meaning data is saved locally on the user's device and not synced across multiple users or devices. -->
     <!-- Visualization & Content Choices:
         - Overall Stats: Inform -> HTML Cards -> Non-interactive -> Quick, scannable summary -> HTML/Tailwind.
-        - Status Breakdown: Compare -> Donut Chart -> Hover tooltips -> Visual comparison of task statuses -> Chart.js.
+        - Status Breakdown: (REMOVED) -> Replaced by calculated progress based on days.
         - Project Timeline: Change -> Custom Gantt Chart -> Hover tooltips on bars -> Best visualization for schedules and dependencies -> Custom JS/HTML/CSS.
         - Task Status Board: Organize -> Kanban-style columns/cards -> Non-interactive -> Intuitive way to view workflow stages -> HTML/Tailwind.
         - Detailed Task List: Organize/Inform -> Filterable/Searchable Table -> Dropdown filters, text search, Edit/Delete buttons -> Provides deep-dive capability and granular data access -> Custom JS/HTML.
@@ -28,6 +28,7 @@
             "完了": { bg: "bg-emerald-200", text: "text-emerald-800" },
             "問題あり": { bg: "bg-red-200", text: "text-red-800" },
         };
+        // statusChartColorsは円グラフ削除に伴い不要だが、他の場所で参照されていないことを確認済み
         const statusChartColors = {
             "未着手": '#e2e8f0', // slate-200
             "進行中": '#7dd3fc', // sky-300
@@ -92,82 +93,43 @@
         }
 
         // --- Render Functions ---
-        let statusChartInstance = null; // To store Chart.js instance for updates
+        // statusChartInstanceは円グラフ削除に伴い不要
+        // let statusChartInstance = null; 
 
         function renderMetrics() {
-            if (wbsData.length === 0) {
-                document.getElementById('total-duration').textContent = `0日`;
-                document.getElementById('total-tasks').textContent = `0`;
-                document.getElementById('current-progress').textContent = `0%`;
-                if (statusChartInstance) {
-                    statusChartInstance.destroy();
-                    statusChartInstance = null;
-                }
-                document.getElementById('status-chart').getContext('2d').clearRect(0, 0, document.getElementById('status-chart').width, document.getElementById('status-chart').height);
-                return;
+            // 総期間の計算
+            let totalProjectDays = 0;
+            if (wbsData.length > 0) {
+                const allDates = wbsData.flatMap(task => [new Date(task.start), new Date(task.end)]);
+                const projectStartDate = new Date(Math.min(...allDates));
+                const projectEndDate = new Date(Math.max(...allDates));
+                totalProjectDays = dateDiffInDays(projectStartDate, projectEndDate) + 1;
             }
-
-            const allDates = wbsData.flatMap(task => [new Date(task.start), new Date(task.end)]);
-            const projectStartDate = new Date(Math.min(...allDates));
-            const projectEndDate = new Date(Math.max(...allDates));
-            const totalProjectDays = dateDiffInDays(projectStartDate, projectEndDate) + 1;
-
             document.getElementById('total-duration').textContent = `${totalProjectDays}日`;
             document.getElementById('total-tasks').textContent = wbsData.length;
 
-            const completedTasks = wbsData.filter(t => t.status === '完了').length;
-            const progress = wbsData.length > 0 ? Math.round((completedTasks / wbsData.length) * 100) : 0;
+            // 現在の進捗率の計算 (完了タスクの総日数 / 全タスクの総日数)
+            let totalTaskDuration = 0;
+            let completedTaskDuration = 0;
+
+            wbsData.forEach(task => {
+                const duration = dateDiffInDays(new Date(task.start), new Date(task.end)) + 1;
+                totalTaskDuration += duration;
+                if (task.status === '完了') {
+                    completedTaskDuration += duration;
+                }
+            });
+
+            let progress = 0;
+            if (totalTaskDuration > 0) {
+                progress = Math.round((completedTaskDuration / totalTaskDuration) * 100);
+            }
             document.getElementById('current-progress').textContent = `${progress}%`;
 
-            const statusCounts = wbsData.reduce((acc, task) => {
-                acc[task.status] = (acc[task.status] || 0) + 1;
-                return acc;
-            }, {});
-
-            const ctx = document.getElementById('status-chart').getContext('2d');
-            if (statusChartInstance) {
-                statusChartInstance.data.labels = Object.keys(statusCounts);
-                statusChartInstance.data.datasets[0].data = Object.values(statusCounts);
-                statusChartInstance.data.datasets[0].backgroundColor = Object.keys(statusCounts).map(status => statusChartColors[status]);
-                statusChartInstance.update();
-            } else {
-                statusChartInstance = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(statusCounts),
-                        datasets: [{
-                            data: Object.values(statusCounts),
-                            backgroundColor: Object.keys(statusCounts).map(status => statusChartColors[status]),
-                            borderWidth: 2,
-                            borderColor: '#f8fafc'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                bodyFont: { family: 'Noto Sans JP' },
-                                titleFont: { family: 'Noto Sans JP' },
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed !== null) {
-                                            label += context.parsed + ' (' + ((context.parsed / wbsData.length) * 100).toFixed(1) + '%)';
-                                        }
-                                        return label;
-                                    }
-                                }
-                            }
-                        },
-                        cutout: '70%'
-                    }
-                });
-            }
+            // 円グラフは削除されるため、以下のChart.js関連のコードは不要
+            // const statusCounts = wbsData.reduce((acc, task) => { /* ... */ });
+            // const ctx = document.getElementById('status-chart').getContext('2d');
+            // if (statusChartInstance) { /* ... */ } else { /* ... */ }
         }
 
         function renderGanttChart() {
@@ -747,7 +709,7 @@
         </header>
 
         <!-- Key Metrics -->
-        <section id="metrics-section" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <section id="metrics-section" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-white p-6 rounded-xl shadow-sm flex items-center space-x-4">
                 <div class="bg-amber-100 p-3 rounded-full">
                     <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -773,12 +735,6 @@
                 <div>
                     <p class="text-sm text-slate-500">現在の進捗</p>
                     <p id="current-progress" class="text-2xl font-bold text-slate-800">0%</p>
-                </div>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm">
-                <p class="text-sm text-slate-500 text-center mb-2">ステータス別タスク</p>
-                <div class="chart-container">
-                    <canvas id="status-chart"></canvas>
                 </div>
             </div>
         </section>
@@ -904,7 +860,7 @@
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-40"></div>
+        <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-40"></div>
         <div id="delete-confirm-modal" class="fixed inset-0 hidden flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
                 <h2 class="text-xl font-bold text-slate-800 mb-4">タスクを削除しますか？</h2>
